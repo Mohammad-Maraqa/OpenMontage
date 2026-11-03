@@ -1,0 +1,40 @@
+name: Piper interpreter-adjacent validation
+on:
+  push:
+    branches: [validation/piper-venv-discovery]
+    paths: [.github/workflows/piper-validation.yml]
+permissions:
+  contents: read
+jobs:
+  linux-tests:
+    if: github.repository == 'Mohammad-Maraqa/OpenMontage' && github.event.repository.private == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      OPENMONTAGE_ALLOW_NETWORK: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+      - name: Verify source and prerequisites
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = 7682ed97d4eb2769ce2126dd25f75aea4cba81b1
+          git diff --exit-code HEAD^ HEAD -- tools tests README.md requirements.txt requirements-dev.txt Makefile
+          git rev-parse HEAD
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          python -m venv .venv
+          .venv/bin/pip install --disable-pip-version-check --only-binary=:all: -r requirements-dev.txt
+          .venv/bin/pip check
+      - name: Focused POSIX resolver and contracts
+        run: .venv/bin/python -m pytest tests/tools/test_piper_tts.py tests/contracts/test_phase3_contracts.py -q
+      - name: Required lint smoke and full tests
+        run: |
+          set -euo pipefail
+          make lint
+          make test
